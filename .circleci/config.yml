@@ -2,22 +2,34 @@ version: 2.1
 orbs:
   node: circleci/node@5.1.0
 
+jobs:
+  publish:
+    executor: node/default
+    steps:
+      - checkout  
+      - node/install-packages
+      - run: |
+          npm set //registry.npmjs.org/:_authToken=$NPM_TOKEN
+          npm publish
+
 workflows:
   test:
     jobs:
+      - node/run:
+          name: lint
+          npm-run: lint
       - node/test: 
           test-results-for: jest
           test-results-path: junit.xml
+          requires: 
+            - lint
 
   deploy:
     jobs:
-      - node/run:
-          npm-run: build
       - publish:
-          name: Publish to NPM
-            command: |
-                npm set //registry.npmjs.org/:_authToken=$NPM_TOKENi
-                npm publish
           filters:
+            branches:
+              ignore: /.*/
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
+
