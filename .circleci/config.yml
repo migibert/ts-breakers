@@ -15,7 +15,9 @@ workflows:
           npm-run: build
       - publish:
           name: Publish to NPM
-            command: npm set //registry.npmjs.org/:_authToken=$NPM_TOKEN && npm publish
+            command: |
+                npm set //registry.npmjs.org/:_authToken=$NPM_TOKENi
+                npm publish
           filters:
             tags:
               only: /v[0-9]+(\.[0-9]+)*/
