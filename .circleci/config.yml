@@ -9,3 +9,13 @@ workflows:
           test-results-for: jest
           test-results-path: junit.xml
 
+  deploy:
+    jobs:
+      - node/run:
+          npm-run: build
+      - publish:
+          name: Publish to NPM
+            command: npm set //registry.npmjs.org/:_authToken=$NPM_TOKEN && npm publish
+          filters:
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
