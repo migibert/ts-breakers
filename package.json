@@ -2,11 +2,11 @@
   "name": "ts-breakers",
   "version": "1.0.0",
   "description": "Basic circuit breaker implementation",
-  "main": "index.js",
+  "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "jest --config jestconfig.json --coverage",
+    "test": "jest --coverage",
     "format": "prettier --write \"src/**/*.ts\" \"src/**/*.ts\"",
     "lint": "tslint -p tsconfig.json",
     "prepare": "npm run build",

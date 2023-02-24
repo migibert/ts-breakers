@@ -31,7 +31,6 @@ describe('Wrapper interface Test Suite', () => {
         class MyError extends Error {
             constructor(msg: string) {
                 super(msg);
-                Object.setPrototypeOf(this, MyError.prototype);
             }
         }
         const fn = () => {
