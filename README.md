@@ -1,3 +1,7 @@
+[![npm version](https://badge.fury.io/js/ts-breakers.svg)](https://badge.fury.io/js/ts-breakers)
+
+[![Build Status](https://circleci.com/gh/migibert/ts-breakers.svg?style=shield)](https://circleci.com/gh/migibert/ts-breakers)
+
 # ts-breakers
 
 This package aims to provide a simple, basic and efficient Circuit Breaker implementation.
