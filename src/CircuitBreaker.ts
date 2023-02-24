@@ -19,8 +19,10 @@ class CircuitBreaker {
 
     public get state(): CircuitBreakerState {
         if (this._state === CircuitBreakerState.OPEN) {
-            const lastFailure = this.lastDetectedFailure || 0;
-            const elapsedTime = new Date().getTime() - lastFailure;
+            if (!this.lastDetectedFailure) {
+                throw new Error('Circuit is OPEN but no last detected failure is known');
+            }
+            const elapsedTime = new Date().getTime() - this.lastDetectedFailure;
             if (elapsedTime > this.recoveryTimeout) {
                 this.state = CircuitBreakerState.HALF_OPEN;
             }
