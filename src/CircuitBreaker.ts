@@ -8,6 +8,7 @@ class CircuitBreaker {
     private failureThreshold: number;
     private lastDetectedFailure?: number;
     private recoveryTimeout: number; // in ms
+    private observers: ((previousState: CircuitBreakerState, currentState: CircuitBreakerState) => void)[];
 
     constructor(id: string, failureThreshold: number, recoveryTimeout: number) {
         this.id = id;
@@ -15,6 +16,7 @@ class CircuitBreaker {
         this.failuresCount = 0;
         this.failureThreshold = failureThreshold;
         this.recoveryTimeout = recoveryTimeout;
+        this.observers = [];
     }
 
     public get state(): CircuitBreakerState {
@@ -31,7 +33,15 @@ class CircuitBreaker {
     }
 
     private set state(state: CircuitBreakerState) {
+        const previousState = this._state;
         this._state = state;
+        for (const observer of this.observers) {
+            observer(previousState, state);
+        }
+    }
+
+    public addObserver(observer: (previousState: CircuitBreakerState, currentState: CircuitBreakerState) => void) {
+        this.observers.push(observer);
     }
 
     public wrapFunction<TArgs extends any[], TReturn>(

@@ -26,6 +26,21 @@ const result = wrapped(2, 3);
 expect(result).toBe(5);
 ```
 
+You may also want to be notified on state changes for logging or collecting metric:
+
+```
+const sum = (a: number, b: number): number => a + b;
+const cb = new CircuitBreaker('mycb', 5, 2000);
+cb.addObserver((previousState: CircuitBreakerState, currentState: CircuitBreakerState) => {
+    console.log(`${previousState} => ${currentState}`);
+});
+
+const wrapped = cb.wrapFunction(sum);
+const result = wrapped(2, 3);
+expect(result).toBe(5);
+```
+
+
 ## Testing
 
 Tests are run:
