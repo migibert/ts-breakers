@@ -2,6 +2,9 @@
 
 [![Build Status](https://circleci.com/gh/migibert/ts-breakers.svg?style=shield)](https://circleci.com/gh/migibert/ts-breakers)
 
+[![codecov](https://codecov.io/gh/migibert/ts-breakers/branch/master/graph/badge.svg)](https://codecov.io/gh/migibert/ts-breakers)
+
+
 # ts-breakers
 
 This package aims to provide a simple, basic and efficient Circuit Breaker implementation.
