@@ -8,7 +8,7 @@ class CircuitBreaker {
     private failureThreshold: number;
     private lastDetectedFailure?: number;
     private recoveryTimeout: number; // in ms
-    private observers: Array<(previousState: CircuitBreakerState, currentState: CircuitBreakerState) => void>;
+    private observers: ((previousState: CircuitBreakerState, currentState: CircuitBreakerState) => void)[];
 
     constructor(id: string, failureThreshold: number, recoveryTimeout: number) {
         this.id = id;
