@@ -1,6 +1,7 @@
 version: 2.1
 orbs:
   node: circleci/node@5.1.0
+  codecov: codecov/codecov@3.2.4
 
 jobs:
   publish:
@@ -23,6 +24,8 @@ workflows:
           test-results-path: junit.xml
           requires: 
             - lint
+          post-steps:
+            - codecov/upload
 
   deploy:
     jobs:
