@@ -168,3 +168,121 @@ describe('State machine Test Suite', () => {
         expect(cb.state).toBe(CircuitBreakerState.OPEN);
     });
 });
+
+describe('Observable interface Test Suite', () => {
+    test('When a Circuit OPENs up, then observers are notified', () => {
+        const failureThreshold = 1;
+        const recoveryTimeout = 20;
+        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+        const observer = jest.fn();
+
+        cb.addObserver(observer);
+        const wrapped = cb.wrapFunction(unstableFn);
+
+        for (let i = 0; i <= failureThreshold; i++) {
+            try {
+                wrapped(true);
+            } catch (e: any) {
+                // Silent error
+            }
+        }
+
+        expect(observer).toBeCalledTimes(1);
+    });
+
+    test('When a Circuit OPENs up, then observers are notified with previous and current state', () => {
+        const failureThreshold = 1;
+        const recoveryTimeout = 20;
+        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+        const observer = (previousState: CircuitBreakerState, currentState: CircuitBreakerState) => {
+            expect(previousState).toBe(CircuitBreakerState.CLOSED);
+            expect(currentState).toBe(CircuitBreakerState.OPEN);
+        };
+        cb.addObserver(observer);
+        const wrapped = cb.wrapFunction(unstableFn);
+
+        for (let i = 0; i <= failureThreshold; i++) {
+            try {
+                wrapped(true);
+            } catch (e: any) {
+                // Silent error
+            }
+        }
+    });
+
+    test('When a Circuit HALF-OPENs, then observers are notified with previous and current state', async () => {
+        const failureThreshold = 1;
+        const recoveryTimeout = 20;
+        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+        const observer = jest.fn();
+
+        cb.addObserver(observer);
+        const wrapped = cb.wrapFunction(unstableFn);
+
+        for (let i = 0; i <= failureThreshold; i++) {
+            try {
+                wrapped(true);
+            } catch (e: any) {
+                // Silent error
+            }
+        }
+
+        await new Promise<void>((res) => setTimeout(res, recoveryTimeout + 5));
+
+        expect(cb.state).toEqual(CircuitBreakerState.HALF_OPEN);
+        expect(observer).toBeCalledTimes(2);
+        expect(observer.mock.calls[0]).toEqual([CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]);
+        expect(observer.mock.calls[1]).toEqual([CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN]);
+    });
+
+    test('When a Circuit CLOSEs, then observers are notified with previous and current state', async () => {
+        const failureThreshold = 1;
+        const recoveryTimeout = 20;
+        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+        const observer = jest.fn();
+
+        cb.addObserver(observer);
+        const wrapped = cb.wrapFunction(unstableFn);
+
+        for (let i = 0; i <= failureThreshold; i++) {
+            try {
+                wrapped(true);
+            } catch (e: any) {
+                // Silent error
+            }
+        }
+
+        await new Promise<void>((res) => setTimeout(res, recoveryTimeout + 5));
+        wrapped(false);
+
+        expect(observer).toBeCalledTimes(3);
+        expect(observer.mock.calls[0]).toEqual([CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]);
+        expect(observer.mock.calls[1]).toEqual([CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN]);
+        expect(observer.mock.calls[2]).toEqual([CircuitBreakerState.HALF_OPEN, CircuitBreakerState.CLOSED]);
+    });
+
+    test('When a Circuit OPENs from HALF-OPEN, then observers are notified with state changes', async () => {
+        const failureThreshold = 1;
+        const recoveryTimeout = 20;
+        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+        const observer = jest.fn();
+
+        cb.addObserver(observer);
+        const wrapped = cb.wrapFunction(unstableFn);
+
+        for (let i = 0; i <= failureThreshold; i++) {
+            try {
+                wrapped(true);
+            } catch (e: any) {
+                // Silent error
+            }
+        }
+
+        await new Promise<void>((res) => setTimeout(res, recoveryTimeout + 5));
+        expect(() => wrapped(true)).toThrow(Error);
+        expect(observer).toBeCalledTimes(3);
+        expect(observer.mock.calls[0]).toEqual([CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]);
+        expect(observer.mock.calls[1]).toEqual([CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN]);
+        expect(observer.mock.calls[2]).toEqual([CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN]);
+    });
+});
