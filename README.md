@@ -6,6 +6,25 @@
 
 This package aims to provide a simple, basic and efficient Circuit Breaker implementation.
 
+The CircuitBreaker pattern is a stateful pattern, as it associates a state to function calls in order to decide if it should fail fast, give a try to the function execution, or execute it normally.
+
+
+## Usage
+
+Some usage examples are available as tests in `CircuitBreaker.test.ts` file.
+
+The most basic example is to create a `CircuitBreaker` instance (for holding the state) then associate it to your subject to failure function by wrapping it.
+
+One example worth thousands words:
+
+```
+const sum = (a: number, b: number): number => a + b;
+const cb = new CircuitBreaker('mycb', 5, 2000);
+const wrapped = cb.wrapFunction(sum);
+const result = wrapped(2, 3);
+expect(result).toBe(5);
+```
+
 ## Testing
 
 Tests are run:
