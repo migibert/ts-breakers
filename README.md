@@ -77,6 +77,19 @@ const result = wrapped(2, 3);
 await expect(result).resolves.toBe(5);
 ```
 
+
+## Decorator
+
+It is also possible to use the `@CircuitBreakerDecorator` decorator to wrap all members of a class.
+
+```
+@CircuitBreakerDecorator({
+    failureThreshold: 1,
+    recoveryTimeout: 3000,
+})
+class MyClass {...}
+```
+
 ## Testing
 
 Tests are run:
