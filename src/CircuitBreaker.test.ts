@@ -9,6 +9,105 @@ const unstableFn = (shouldThrow: boolean): boolean => {
     return shouldThrow;
 };
 
+const testCircuitBreakerStateAfterNFailures = (
+    cb: CircuitBreaker,
+    functionToWrap: (failing: boolean) => boolean,
+    consecutiveFailuresCount: number,
+    expectedState: CircuitBreakerState,
+    delay?: number,
+): (failing: boolean) => boolean => {
+    const wrapped = cb.wrapFunction(functionToWrap);
+
+    for (let i = 0; i < consecutiveFailuresCount; i++) {
+        try {
+            wrapped(true);
+        } catch (e: any) {
+            // Silent error
+        }
+    }
+
+    if (delay) {
+        jest.advanceTimersByTime(delay);
+    }
+
+    expect(cb.state).toBe(expectedState);
+    return wrapped;
+};
+
+describe('Test Suite', () => {
+    beforeEach(() => {
+        jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+        jest.runOnlyPendingTimers();
+        jest.useRealTimers();
+    });
+
+    describe('State machine Test Suite', () => {
+        test('When a new circuit breaker is created, then its state is CLOSED', () => {
+            const failureThreshold = 3;
+            const recoveryTimeout = 100;
+            const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+            testCircuitBreakerStateAfterNFailures(cb, unstableFn, 0, CircuitBreakerState.CLOSED);
+        });
+    
+        test('When the Circuit is CLOSED and wrapped function reaches its failure threshold, then it OPENs up', () => {
+            const failureThreshold = 3;
+            const recoveryTimeout = 100;
+            const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+            const wrapped = testCircuitBreakerStateAfterNFailures(cb, unstableFn, failureThreshold+1, CircuitBreakerState.OPEN);
+    
+            expect(() => wrapped(false)).toThrow(CircuitBreakerError);
+        });
+    
+        test('When the Circuit is CLOSED and wrapped function does not reach its failure threshold, then it remains CLOSED', () => {
+            const failureThreshold = 3;
+            const recoveryTimeout = 100;
+            const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+            testCircuitBreakerStateAfterNFailures(cb, unstableFn, failureThreshold-1, CircuitBreakerState.CLOSED);
+        });
+    
+        test('When the Circuit is OPEN and recovery time is reached, then it HALF-OPENs', () => {
+            const failureThreshold = 3;
+            const recoveryTimeout = 100;
+            const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+            testCircuitBreakerStateAfterNFailures(cb, unstableFn, failureThreshold+1, CircuitBreakerState.HALF_OPEN, recoveryTimeout+20);
+        });
+    
+        test('When the Circuit is OPEN and recovery time is not reached, then it remains OPEN', () => {
+            const failureThreshold = 3;
+            const recoveryTimeout = 100;
+            const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+            
+            const wrapped = testCircuitBreakerStateAfterNFailures(cb, unstableFn, failureThreshold+1, CircuitBreakerState.OPEN, recoveryTimeout-20);
+            expect(() => wrapped(false)).toThrow(CircuitBreakerError);
+        });
+    
+        test('When the Circuit is HALF-OPEN and wrapped function succeeds, then it CLOSEs', () => {
+            const failureThreshold = 3;
+            const recoveryTimeout = 100;
+            const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+            const wrapped = testCircuitBreakerStateAfterNFailures(cb, unstableFn, failureThreshold+1, CircuitBreakerState.HALF_OPEN, recoveryTimeout+20);
+    
+            const result = wrapped(false);
+
+            expect(result).toBe(false);
+            expect(cb.state).toBe(CircuitBreakerState.CLOSED);
+        });
+    
+        test('When the Circuit is HALF-OPEN and wrapped function fails, then it OPENs', () => {
+            const failureThreshold = 3;
+            const recoveryTimeout = 100;
+            const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+            const wrapped = testCircuitBreakerStateAfterNFailures(cb, unstableFn, failureThreshold+1, CircuitBreakerState.HALF_OPEN, recoveryTimeout+20);
+            
+            expect(() => wrapped(true)).toThrow(Error);
+            expect(cb.state).toBe(CircuitBreakerState.OPEN);
+        });
+    });
+})
+
 describe('Wrapper interface Test Suite', () => {
     test('When function is wrapped, then its parameter and typing are preserved', () => {
         const sum = (a: number, b: number): number => a + b;
@@ -40,131 +139,6 @@ describe('Wrapper interface Test Suite', () => {
         const wrapped = cb.wrapFunction(fn);
 
         expect(() => wrapped()).toThrow(MyError);
-    });
-});
-
-describe('State machine Test Suite', () => {
-    test('When a new circuit breaker is created, then its state is CLOSED', () => {
-        const fn = () => true;
-        const cb = new CircuitBreaker('test', 5, 2000);
-        const wrapped = cb.wrapFunction(fn);
-
-        const result = wrapped();
-
-        expect(cb.state).toBe(CircuitBreakerState.CLOSED);
-    });
-
-    test('When the Circuit is CLOSED and wrapped function reaches its failure threshold, then it OPENs up', () => {
-        const failureThreshold = 3;
-        const cb = new CircuitBreaker('test', failureThreshold, 2000);
-        const wrapped = cb.wrapFunction(unstableFn);
-
-        for (let i = 0; i <= failureThreshold; i++) {
-            try {
-                wrapped(true);
-            } catch (e: any) {
-                // Silent error
-            }
-        }
-
-        expect(cb.state).toBe(CircuitBreakerState.OPEN);
-        expect(() => wrapped(false)).toThrow(CircuitBreakerError);
-    });
-
-    test('When the Circuit is CLOSED and wrapped function does not reach its failure threshold, then it remains CLOSED', () => {
-        const failureThreshold = 3;
-        const cb = new CircuitBreaker('test', failureThreshold, 2000);
-        const wrapped = cb.wrapFunction(unstableFn);
-
-        for (let i = 0; i < failureThreshold; i++) {
-            try {
-                wrapped(true);
-            } catch (e: any) {
-                // Silent error
-            }
-        }
-
-        expect(cb.state).toBe(CircuitBreakerState.CLOSED);
-    });
-
-    test('When the Circuit is OPEN and recovery time is reached, then it HALF-OPENs', async () => {
-        const failureThreshold = 3;
-        const recoveryTimeout = 20;
-        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
-        const wrapped = cb.wrapFunction(unstableFn);
-
-        for (let i = 0; i <= failureThreshold; i++) {
-            try {
-                wrapped(true);
-            } catch (e: any) {
-                // Silent error
-            }
-        }
-
-        await new Promise<void>((res) => setTimeout(res, recoveryTimeout + 5));
-
-        expect(cb.state).toBe(CircuitBreakerState.HALF_OPEN);
-    });
-
-    test('When the Circuit is OPEN and recovery time is not reached, then it remains OPEN', async () => {
-        const failureThreshold = 3;
-        const recoveryTimeout = 20;
-        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
-        const wrapped = cb.wrapFunction(unstableFn);
-
-        for (let i = 0; i <= failureThreshold; i++) {
-            try {
-                wrapped(true);
-            } catch (e: any) {
-                // Silent error
-            }
-        }
-
-        await new Promise<void>((res) => setTimeout(res, recoveryTimeout - 5));
-
-        expect(() => wrapped(false)).toThrow(CircuitBreakerError);
-        expect(cb.state).toBe(CircuitBreakerState.OPEN);
-    });
-
-    test('When the Circuit is HALF-OPEN and wrapped function succeeds, then it CLOSEs', async () => {
-        const failureThreshold = 3;
-        const recoveryTimeout = 20;
-        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
-        const wrapped = cb.wrapFunction(unstableFn);
-
-        for (let i = 0; i <= failureThreshold; i++) {
-            try {
-                wrapped(true);
-            } catch (e: any) {
-                // Silent error
-            }
-        }
-
-        await new Promise<void>((res) => setTimeout(res, recoveryTimeout + 5));
-
-        const result = wrapped(false);
-        expect(result).toBe(false);
-        expect(cb.state).toBe(CircuitBreakerState.CLOSED);
-    });
-
-    test('When the Circuit is HALF-OPEN and wrapped function fails, then it OPENs', async () => {
-        const failureThreshold = 3;
-        const recoveryTimeout = 20;
-        const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
-        const wrapped = cb.wrapFunction(unstableFn);
-
-        for (let i = 0; i <= failureThreshold; i++) {
-            try {
-                wrapped(true);
-            } catch (e: any) {
-                // Silent error
-            }
-        }
-
-        await new Promise<void>((res) => setTimeout(res, recoveryTimeout + 5));
-
-        expect(() => wrapped(true)).toThrow(Error);
-        expect(cb.state).toBe(CircuitBreakerState.OPEN);
     });
 });
 
