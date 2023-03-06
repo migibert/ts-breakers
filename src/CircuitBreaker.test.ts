@@ -184,7 +184,7 @@ describe('Test Suite', () => {
     });
 });
 
-describe('Wrapper interface Test Suite', () => {
+describe('Synchronous Wrapper interface Test Suite', () => {
     test('When function is wrapped, then its parameter and typing are preserved', () => {
         const sum = (a: number, b: number): number => a + b;
         const cb = new CircuitBreaker('test', 5, 2000);
@@ -208,5 +208,32 @@ describe('Wrapper interface Test Suite', () => {
         const wrapped = failConsecutively(cb, unstableFn, failureThreshold + 1);
 
         expect(() => wrapped(true)).toThrow(CircuitBreakerError);
+    });
+});
+
+describe('Asynchronous Wrapper interface Test Suite', () => {
+    test('When function is wrapped, then its parameter and typing are preserved', async () => {
+        const sum = (a: number, b: number): Promise<number> => Promise.resolve(a + b);
+        const cb = new CircuitBreaker('test', 5, 2000);
+        const wrapped = cb.wrapAsyncFunction(sum);
+
+        const result = wrapped(2, 3);
+
+        await expect(result).resolves.toBe(5);
+    });
+
+    test('When function is wrapped, then its exceptions are bubbled up', async () => {
+        const cb = new CircuitBreaker('test', 5, 2000);
+        const wrapped = cb.wrapAsyncFunction(unstableAsyncFn);
+
+        await expect(wrapped(true)).rejects.toThrow(MyError);
+    });
+
+    test('When function is wrapped and circuit is open, then thrown exception is CircuitBreakerError', async() => {
+        const failureThreshold = 3;
+        const cb = new CircuitBreaker('test', failureThreshold, 2000);
+        const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, failureThreshold + 1);
+
+        await expect(wrapped(true)).rejects.toThrow(CircuitBreakerError);
     });
 });
