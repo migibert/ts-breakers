@@ -62,6 +62,31 @@ const failConsecutively = (
     return wrapped;
 };
 
+const testSynchronousExtraFailure = (wrapped: (failing: boolean) => boolean, extraFailure?: boolean) => {
+    if (extraFailure === undefined) {
+        return;
+    }
+    if (extraFailure === true) {
+        expect(() => wrapped(extraFailure)).toThrow(MyError);
+    } else {
+        expect(wrapped(extraFailure)).toBe(extraFailure);
+    }
+};
+
+const testAsynchronousExtraFailure = async (
+    wrapped: (failing: boolean) => Promise<boolean>,
+    extraFailure?: boolean,
+) => {
+    if (extraFailure === undefined) {
+        return;
+    }
+    if (extraFailure === true) {
+        await expect(() => wrapped(extraFailure)).rejects.toThrow(MyError);
+    } else {
+        await expect(wrapped(extraFailure)).resolves.toBe(extraFailure);
+    }
+};
+
 describe('Test Suite', () => {
     const failureThreshold = 3;
     const recoveryTimeout = 100;
@@ -75,28 +100,26 @@ describe('Test Suite', () => {
         jest.useRealTimers();
     });
 
-    describe('Synchronous wrapper state machine Test Suite', () => {
+    describe.each([{ sync: true }, { sync: false }])('State Machine Test Suite - synchronous: $sync', (args) => {
+        const synchronous = args.sync;
         test.each([
             {
                 consecutiveFailures: 0,
                 delay: 0,
                 expectedState: CircuitBreakerState.CLOSED,
                 expectedNotifications: [],
-                extraFailure: null,
             },
             {
                 consecutiveFailures: failureThreshold + 1,
                 delay: 0,
                 expectedState: CircuitBreakerState.OPEN,
                 expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
-                extraFailure: null,
             },
             {
                 consecutiveFailures: failureThreshold,
                 delay: 0,
                 expectedState: CircuitBreakerState.CLOSED,
                 expectedNotifications: [],
-                extraFailure: null,
             },
             {
                 consecutiveFailures: failureThreshold + 1,
@@ -106,14 +129,12 @@ describe('Test Suite', () => {
                     [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
                     [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
                 ],
-                extraFailure: null,
             },
             {
                 consecutiveFailures: failureThreshold + 1,
                 delay: recoveryTimeout - 20,
                 expectedState: CircuitBreakerState.OPEN,
                 expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
-                extraFailure: null,
             },
             {
                 consecutiveFailures: failureThreshold + 1,
@@ -124,7 +145,7 @@ describe('Test Suite', () => {
                     [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
                     [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN],
                 ],
-                extraFailure: true,
+                failAfterDelay: true,
             },
             {
                 consecutiveFailures: failureThreshold + 1,
@@ -135,108 +156,23 @@ describe('Test Suite', () => {
                     [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
                     [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.CLOSED],
                 ],
-                extraFailure: false,
+                failAfterDelay: false,
             },
         ])(
             'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen, $delay ms elapsed, then the circuit is $expectedState',
-            ({ consecutiveFailures, delay, expectedState, expectedNotifications, extraFailure }) => {
+            async ({ consecutiveFailures, delay, expectedState, expectedNotifications, failAfterDelay }) => {
                 const observer = jest.fn();
                 const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
                 cb.addObserver(observer);
-                const wrapped = failConsecutively(cb, unstableFn, consecutiveFailures);
-                jest.advanceTimersByTime(delay);
-                if (extraFailure !== null) {
-                    if (extraFailure === true) {
-                        expect(() => wrapped(extraFailure)).toThrow(MyError);
-                    } else {
-                        expect(wrapped(extraFailure)).toBe(extraFailure);
-                    }
-                }
-                expect(cb.state).toBe(expectedState);
-                expect(observer).toBeCalledTimes(expectedNotifications.length);
-                for (let i = 0; i < expectedNotifications.length; i++) {
-                    expect(observer.mock.calls[i]).toEqual(expectedNotifications[i]);
-                }
-            },
-        );
-    });
 
-    describe('Asynchronous wrapper state machine Test Suite', () => {
-        test.each([
-            {
-                consecutiveFailures: 0,
-                delay: 0,
-                expectedState: CircuitBreakerState.CLOSED,
-                expectedNotifications: [],
-                extraFailure: null,
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: 0,
-                expectedState: CircuitBreakerState.OPEN,
-                expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
-                extraFailure: null,
-            },
-            {
-                consecutiveFailures: failureThreshold,
-                delay: 0,
-                expectedState: CircuitBreakerState.CLOSED,
-                expectedNotifications: [],
-                extraFailure: null,
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: recoveryTimeout + 20,
-                expectedState: CircuitBreakerState.HALF_OPEN,
-                expectedNotifications: [
-                    [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                    [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                ],
-                extraFailure: null,
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: recoveryTimeout - 20,
-                expectedState: CircuitBreakerState.OPEN,
-                expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
-                extraFailure: null,
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: recoveryTimeout + 20,
-                expectedState: CircuitBreakerState.OPEN,
-                expectedNotifications: [
-                    [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                    [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                    [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN],
-                ],
-                extraFailure: true,
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: recoveryTimeout + 20,
-                expectedState: CircuitBreakerState.CLOSED,
-                expectedNotifications: [
-                    [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                    [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                    [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.CLOSED],
-                ],
-                extraFailure: false,
-            },
-        ])(
-            'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen and $delay ms elapsed, then the circuit is $expectedState',
-            async ({ consecutiveFailures, delay, expectedState, expectedNotifications, extraFailure }) => {
-                const observer = jest.fn();
-                const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
-                cb.addObserver(observer);
-                const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, consecutiveFailures);
-                jest.advanceTimersByTime(delay);
-                if (extraFailure !== null) {
-                    if (extraFailure === true) {
-                        await expect(wrapped(true)).rejects.toThrow(MyError);
-                    } else {
-                        await expect(wrapped(false)).resolves.toBe(extraFailure);
-                    }
+                if (synchronous === true) {
+                    const wrapped = failConsecutively(cb, unstableFn, consecutiveFailures);
+                    jest.advanceTimersByTime(delay);
+                    testSynchronousExtraFailure(wrapped, failAfterDelay);
+                } else {
+                    const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, consecutiveFailures);
+                    jest.advanceTimersByTime(delay);
+                    await testAsynchronousExtraFailure(wrapped, failAfterDelay);
                 }
                 expect(cb.state).toBe(expectedState);
                 expect(observer).toBeCalledTimes(expectedNotifications.length);
