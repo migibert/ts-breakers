@@ -157,16 +157,6 @@ describe('Wrapper interface Test Suite', () => {
         const cb = new CircuitBreaker('test', 5, 2000);
         const wrapped = cb.wrapFunction(unstableFn);
 
-        expect(() => wrapped(true)).toThrow(Error);
-    });
-
-    test('When function is wrapped, then its exceptions type are preserved', () => {
-        const fn = () => {
-            throw new MyError('Raise as expected');
-        };
-        const cb = new CircuitBreaker('test', 5, 2000);
-        const wrapped = cb.wrapFunction(fn);
-
-        expect(() => wrapped()).toThrow(MyError);
+        expect(() => wrapped(true)).toThrow(MyError);
     });
 });
