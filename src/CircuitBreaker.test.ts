@@ -22,18 +22,25 @@ const unstableAsyncFn = (shouldThrow: boolean): Promise<boolean> => {
     return Promise.resolve(shouldThrow);
 };
 
-const failConsecutivelyAsync = (
+const failConsecutivelyAsync = async (
     cb: CircuitBreaker,
     functionToWrap: (failing: boolean) => Promise<boolean>,
     consecutiveFailuresCount: number,
-): ((failing: boolean) => Promise<boolean>) => {
-    const wrapped = cb.wrapFunction(functionToWrap);
+): Promise<(failing: boolean) => Promise<boolean>> => {
+    const wrapped = cb.wrapAsyncFunction(functionToWrap);
 
+    const promises: Array<Promise<boolean>> = [];
     for (let i = 0; i < consecutiveFailuresCount; i++) {
         const promise = wrapped(true);
         promise.catch((_: any) => {
             /* Silent error */
         });
+        promises.push(promise);
+    }
+    try {
+        await Promise.allSettled(promises);
+    } catch (e: any) {
+        // Silent error
     }
     return wrapped;
 };
@@ -217,18 +224,18 @@ describe('Test Suite', () => {
                 extraFailure: false,
             },
         ])(
-            'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen and $delay ms elapsed, then the circuit is $expectedState ${extraFailure? toto: tata}',
-            ({ consecutiveFailures, delay, expectedState, expectedNotifications, extraFailure }) => {
+            'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen and $delay ms elapsed, then the circuit is $expectedState',
+            async ({ consecutiveFailures, delay, expectedState, expectedNotifications, extraFailure }) => {
                 const observer = jest.fn();
                 const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
                 cb.addObserver(observer);
-                const wrapped = failConsecutivelyAsync(cb, unstableAsyncFn, consecutiveFailures);
+                const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, consecutiveFailures);
                 jest.advanceTimersByTime(delay);
                 if (extraFailure !== null) {
                     if (extraFailure === true) {
-                        expect(() => wrapped(extraFailure)).rejects.toThrow(MyError);
+                        await expect(wrapped(true)).rejects.toThrow(MyError);
                     } else {
-                        expect(wrapped(extraFailure)).resolves.toBe(extraFailure);
+                        await expect(wrapped(false)).resolves.toBe(extraFailure);
                     }
                 }
                 expect(cb.state).toBe(expectedState);

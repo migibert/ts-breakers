@@ -62,6 +62,27 @@ class CircuitBreaker {
         };
     }
 
+    public wrapAsyncFunction<TArgs extends any[], TReturn>(
+        targetFunction: (...parameters: TArgs) => Promise<TReturn>,
+    ): (...parameters: TArgs) => Promise<TReturn> {
+        return (...parameters: TArgs): Promise<TReturn> => {
+            if (this.state === CircuitBreakerState.OPEN) {
+                return Promise.reject(new CircuitBreakerError(`Circuit ${this.id} is OPEN`));
+            }
+            const promise = targetFunction(...parameters);
+            return promise.then(
+                (value: TReturn) => {
+                    this.handleSuccess();
+                    return value;
+                },
+                (error: any) => {
+                    this.handleFailure();
+                    throw error;
+                },
+            );
+        };
+    }
+
     private handleSuccess(): void {
         this.failuresCount = 0;
         if (this.state === CircuitBreakerState.HALF_OPEN) {
