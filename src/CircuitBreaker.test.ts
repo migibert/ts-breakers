@@ -87,7 +87,7 @@ const testAsynchronousExtraFailure = async (
     }
 };
 
-describe('Test Suite', () => {
+describe('State Machine Test Suite', () => {
     const failureThreshold = 3;
     const recoveryTimeout = 100;
 
@@ -100,140 +100,144 @@ describe('Test Suite', () => {
         jest.useRealTimers();
     });
 
-    describe.each([{ sync: true }, { sync: false }])('State Machine Test Suite - synchronous: $sync', (args) => {
+    describe.each([{ sync: true }, { sync: false }])('', (args) => {
         const synchronous = args.sync;
-        test.each([
-            {
-                consecutiveFailures: 0,
-                delay: 0,
-                expectedState: CircuitBreakerState.CLOSED,
-                expectedNotifications: [],
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: 0,
-                expectedState: CircuitBreakerState.OPEN,
-                expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
-            },
-            {
-                consecutiveFailures: failureThreshold,
-                delay: 0,
-                expectedState: CircuitBreakerState.CLOSED,
-                expectedNotifications: [],
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: recoveryTimeout + 20,
-                expectedState: CircuitBreakerState.HALF_OPEN,
-                expectedNotifications: [
-                    [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                    [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                ],
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: recoveryTimeout - 20,
-                expectedState: CircuitBreakerState.OPEN,
-                expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: recoveryTimeout + 20,
-                expectedState: CircuitBreakerState.OPEN,
-                expectedNotifications: [
-                    [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                    [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                    [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN],
-                ],
-                failAfterDelay: true,
-            },
-            {
-                consecutiveFailures: failureThreshold + 1,
-                delay: recoveryTimeout + 20,
-                expectedState: CircuitBreakerState.CLOSED,
-                expectedNotifications: [
-                    [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                    [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                    [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.CLOSED],
-                ],
-                failAfterDelay: false,
-            },
-        ])(
-            'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen, $delay ms elapsed, then the circuit is $expectedState',
-            async ({ consecutiveFailures, delay, expectedState, expectedNotifications, failAfterDelay }) => {
-                const observer = jest.fn();
-                const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
-                cb.addObserver(observer);
+        describe(`${synchronous ? 'synchronous' : 'asynchronous'}`, () => {
+            test.each([
+                {
+                    consecutiveFailures: 0,
+                    delay: 0,
+                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedNotifications: [],
+                },
+                {
+                    consecutiveFailures: failureThreshold + 1,
+                    delay: 0,
+                    expectedState: CircuitBreakerState.OPEN,
+                    expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
+                },
+                {
+                    consecutiveFailures: failureThreshold,
+                    delay: 0,
+                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedNotifications: [],
+                },
+                {
+                    consecutiveFailures: failureThreshold + 1,
+                    delay: recoveryTimeout + 20,
+                    expectedState: CircuitBreakerState.HALF_OPEN,
+                    expectedNotifications: [
+                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
+                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
+                    ],
+                },
+                {
+                    consecutiveFailures: failureThreshold + 1,
+                    delay: recoveryTimeout - 20,
+                    expectedState: CircuitBreakerState.OPEN,
+                    expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
+                },
+                {
+                    consecutiveFailures: failureThreshold + 1,
+                    delay: recoveryTimeout + 20,
+                    expectedState: CircuitBreakerState.OPEN,
+                    expectedNotifications: [
+                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
+                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
+                        [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN],
+                    ],
+                    failAfterDelay: true,
+                },
+                {
+                    consecutiveFailures: failureThreshold + 1,
+                    delay: recoveryTimeout + 20,
+                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedNotifications: [
+                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
+                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
+                        [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.CLOSED],
+                    ],
+                    failAfterDelay: false,
+                },
+            ])(
+                'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen, $delay ms elapsed, then the circuit is $expectedState',
+                async ({ consecutiveFailures, delay, expectedState, expectedNotifications, failAfterDelay }) => {
+                    const observer = jest.fn();
+                    const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+                    cb.addObserver(observer);
 
-                if (synchronous === true) {
-                    const wrapped = failConsecutively(cb, unstableFn, consecutiveFailures);
-                    jest.advanceTimersByTime(delay);
-                    testSynchronousExtraFailure(wrapped, failAfterDelay);
-                } else {
-                    const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, consecutiveFailures);
-                    jest.advanceTimersByTime(delay);
-                    await testAsynchronousExtraFailure(wrapped, failAfterDelay);
-                }
-                expect(cb.state).toBe(expectedState);
-                expect(observer).toBeCalledTimes(expectedNotifications.length);
-                for (let i = 0; i < expectedNotifications.length; i++) {
-                    expect(observer.mock.calls[i]).toEqual(expectedNotifications[i]);
-                }
-            },
-        );
+                    if (synchronous === true) {
+                        const wrapped = failConsecutively(cb, unstableFn, consecutiveFailures);
+                        jest.advanceTimersByTime(delay);
+                        testSynchronousExtraFailure(wrapped, failAfterDelay);
+                    } else {
+                        const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, consecutiveFailures);
+                        jest.advanceTimersByTime(delay);
+                        await testAsynchronousExtraFailure(wrapped, failAfterDelay);
+                    }
+                    expect(cb.state).toBe(expectedState);
+                    expect(observer).toBeCalledTimes(expectedNotifications.length);
+                    for (let i = 0; i < expectedNotifications.length; i++) {
+                        expect(observer.mock.calls[i]).toEqual(expectedNotifications[i]);
+                    }
+                },
+            );
+        });
     });
 });
 
-describe('Synchronous Wrapper interface Test Suite', () => {
-    test('When function is wrapped, then its parameter and typing are preserved', () => {
-        const sum = (a: number, b: number): number => a + b;
-        const cb = new CircuitBreaker('test', 5, 2000);
-        const wrapped = cb.wrapFunction(sum);
+describe('Wrapper Interface Test Suite', () => {
+    describe('synchronous', () => {
+        test('When function is wrapped, then its parameter and typing are preserved', () => {
+            const sum = (a: number, b: number): number => a + b;
+            const cb = new CircuitBreaker('test', 5, 2000);
+            const wrapped = cb.wrapFunction(sum);
 
-        const result = wrapped(2, 3);
+            const result = wrapped(2, 3);
 
-        expect(result).toBe(5);
+            expect(result).toBe(5);
+        });
+
+        test('When function is wrapped, then its exceptions are bubbled up', () => {
+            const cb = new CircuitBreaker('test', 5, 2000);
+            const wrapped = cb.wrapFunction(unstableFn);
+
+            expect(() => wrapped(true)).toThrow(MyError);
+        });
+
+        test('When function is wrapped and circuit is open, then thrown exception is CircuitBreakerError', () => {
+            const failureThreshold = 3;
+            const cb = new CircuitBreaker('test', failureThreshold, 2000);
+            const wrapped = failConsecutively(cb, unstableFn, failureThreshold + 1);
+
+            expect(() => wrapped(true)).toThrow(CircuitBreakerError);
+        });
     });
 
-    test('When function is wrapped, then its exceptions are bubbled up', () => {
-        const cb = new CircuitBreaker('test', 5, 2000);
-        const wrapped = cb.wrapFunction(unstableFn);
+    describe('asynchronous', () => {
+        test('When function is wrapped, then its parameter and typing are preserved', async () => {
+            const sum = (a: number, b: number): Promise<number> => Promise.resolve(a + b);
+            const cb = new CircuitBreaker('test', 5, 2000);
+            const wrapped = cb.wrapAsyncFunction(sum);
 
-        expect(() => wrapped(true)).toThrow(MyError);
-    });
+            const result = wrapped(2, 3);
 
-    test('When function is wrapped and circuit is open, then thrown exception is CircuitBreakerError', () => {
-        const failureThreshold = 3;
-        const cb = new CircuitBreaker('test', failureThreshold, 2000);
-        const wrapped = failConsecutively(cb, unstableFn, failureThreshold + 1);
+            await expect(result).resolves.toBe(5);
+        });
 
-        expect(() => wrapped(true)).toThrow(CircuitBreakerError);
-    });
-});
+        test('When function is wrapped, then its exceptions are bubbled up', async () => {
+            const cb = new CircuitBreaker('test', 5, 2000);
+            const wrapped = cb.wrapAsyncFunction(unstableAsyncFn);
 
-describe('Asynchronous Wrapper interface Test Suite', () => {
-    test('When function is wrapped, then its parameter and typing are preserved', async () => {
-        const sum = (a: number, b: number): Promise<number> => Promise.resolve(a + b);
-        const cb = new CircuitBreaker('test', 5, 2000);
-        const wrapped = cb.wrapAsyncFunction(sum);
+            await expect(wrapped(true)).rejects.toThrow(MyError);
+        });
 
-        const result = wrapped(2, 3);
+        test('When function is wrapped and circuit is open, then thrown exception is CircuitBreakerError', async () => {
+            const failureThreshold = 3;
+            const cb = new CircuitBreaker('test', failureThreshold, 2000);
+            const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, failureThreshold + 1);
 
-        await expect(result).resolves.toBe(5);
-    });
-
-    test('When function is wrapped, then its exceptions are bubbled up', async () => {
-        const cb = new CircuitBreaker('test', 5, 2000);
-        const wrapped = cb.wrapAsyncFunction(unstableAsyncFn);
-
-        await expect(wrapped(true)).rejects.toThrow(MyError);
-    });
-
-    test('When function is wrapped and circuit is open, then thrown exception is CircuitBreakerError', async() => {
-        const failureThreshold = 3;
-        const cb = new CircuitBreaker('test', failureThreshold, 2000);
-        const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, failureThreshold + 1);
-
-        await expect(wrapped(true)).rejects.toThrow(CircuitBreakerError);
+            await expect(wrapped(true)).rejects.toThrow(CircuitBreakerError);
+        });
     });
 });
