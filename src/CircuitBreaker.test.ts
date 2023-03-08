@@ -1,6 +1,6 @@
-import { CircuitBreakerState } from './CircuitBreakerState';
 import { CircuitBreaker } from './CircuitBreaker';
 import { CircuitBreakerError } from './CircuitBreakerError';
+import { CircuitBreakerStatus } from './ICircuitBreakerState';
 
 class MyError extends Error {
     constructor(msg: string) {
@@ -107,61 +107,61 @@ describe('State Machine Test Suite', () => {
                 {
                     consecutiveFailures: 0,
                     delay: 0,
-                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedStatus: CircuitBreakerStatus.CLOSED,
                     expectedNotifications: [],
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: 0,
-                    expectedState: CircuitBreakerState.OPEN,
-                    expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
+                    expectedStatus: CircuitBreakerStatus.OPEN,
+                    expectedNotifications: [[CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN]],
                 },
                 {
                     consecutiveFailures: failureThreshold,
                     delay: 0,
-                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedStatus: CircuitBreakerStatus.CLOSED,
                     expectedNotifications: [],
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: recoveryTimeout + 20,
-                    expectedState: CircuitBreakerState.HALF_OPEN,
+                    expectedStatus: CircuitBreakerStatus.HALF_OPEN,
                     expectedNotifications: [
-                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
+                        [CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN],
+                        [CircuitBreakerStatus.OPEN, CircuitBreakerStatus.HALF_OPEN],
                     ],
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: recoveryTimeout - 20,
-                    expectedState: CircuitBreakerState.OPEN,
-                    expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
+                    expectedStatus: CircuitBreakerStatus.OPEN,
+                    expectedNotifications: [[CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN]],
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: recoveryTimeout + 20,
-                    expectedState: CircuitBreakerState.OPEN,
+                    expectedStatus: CircuitBreakerStatus.OPEN,
                     expectedNotifications: [
-                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                        [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN],
+                        [CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN],
+                        [CircuitBreakerStatus.OPEN, CircuitBreakerStatus.HALF_OPEN],
+                        [CircuitBreakerStatus.HALF_OPEN, CircuitBreakerStatus.OPEN],
                     ],
                     failAfterDelay: true,
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: recoveryTimeout + 20,
-                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedStatus: CircuitBreakerStatus.CLOSED,
                     expectedNotifications: [
-                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                        [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.CLOSED],
+                        [CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN],
+                        [CircuitBreakerStatus.OPEN, CircuitBreakerStatus.HALF_OPEN],
+                        [CircuitBreakerStatus.HALF_OPEN, CircuitBreakerStatus.CLOSED],
                     ],
                     failAfterDelay: false,
                 },
             ])(
-                'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen, $delay ms elapsed, then the circuit is $expectedState',
-                async ({ consecutiveFailures, delay, expectedState, expectedNotifications, failAfterDelay }) => {
+                'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen, $delay ms elapsed, then the circuit is $expectedStatus',
+                async ({ consecutiveFailures, delay, expectedStatus, expectedNotifications, failAfterDelay }) => {
                     const observer = jest.fn();
                     const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
                     cb.addObserver(observer);
@@ -175,7 +175,7 @@ describe('State Machine Test Suite', () => {
                         jest.advanceTimersByTime(delay);
                         await testAsynchronousExtraFailure(wrapped, failAfterDelay);
                     }
-                    expect(cb.state).toBe(expectedState);
+                    expect(cb.getStatus()).toBe(expectedStatus);
                     expect(observer).toBeCalledTimes(expectedNotifications.length);
                     for (let i = 0; i < expectedNotifications.length; i++) {
                         expect(observer.mock.calls[i]).toEqual(expectedNotifications[i]);
