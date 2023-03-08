@@ -21,7 +21,7 @@ describe('CircuitBreakerDecorator test Suite', () => {
         myInstance = new ClassUnderTest();
     });
 
-    it('should throw a CircuitBreakerError when consecutive fail are superior to 1', () => {
+    test('should throw a CircuitBreakerError when consecutive fail are superior to 1', () => {
         try {
             const result = () => {
                 try {
