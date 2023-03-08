@@ -1,7 +1,7 @@
 import { CircuitBreaker } from '../CircuitBreaker';
 import { CircuitBreakerState } from '../CircuitBreakerState';
 
-type CBConfig = {
+type CircuitBreakerConfiguration = {
     failureThreshold: number;
     recoveryTimeout: number;
     observers?: ((previousState: CircuitBreakerState, currentState: CircuitBreakerState) => void)[];
@@ -9,7 +9,7 @@ type CBConfig = {
 
 /**
  * CircuitBreakerDecorator is a decorator that wraps all the methods of a class with the wrapFunction from CircuitBreaker instance.
- * @param {CBConfig} config
+ * @param {CircuitBreakerConfiguration} config
  * @return {ClassDecorator}
  * @example
  *
@@ -20,7 +20,7 @@ type CBConfig = {
  *  class MyClass {...}
  *
  */
-export function CircuitBreakerDecorator(config: CBConfig): ClassDecorator {
+export function CircuitBreakerDecorator(config: CircuitBreakerConfiguration): ClassDecorator {
     const { failureThreshold, recoveryTimeout } = config;
     return (target: Function) => {
         const circuitBreaker = new CircuitBreaker(target.name, failureThreshold, recoveryTimeout);
