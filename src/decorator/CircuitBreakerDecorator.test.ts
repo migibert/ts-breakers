@@ -30,7 +30,6 @@ describe('CircuitBreakerDecorator test Suite', () => {
                     if (e instanceof CircuitBreakerError) {
                         throw e;
                     }
-                    console.log(e);
                     result();
                 }
             };
