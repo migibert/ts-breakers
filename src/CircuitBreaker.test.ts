@@ -1,6 +1,6 @@
 import { CircuitBreaker } from './CircuitBreaker';
 import { CircuitBreakerError } from './CircuitBreakerError';
-import { CircuitBreakerStatus } from './ICircuitBreakerState';
+import { CircuitBreakerStatus } from './CircuitBreakerState';
 
 class MyError extends Error {
     constructor(msg: string) {

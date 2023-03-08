@@ -1,12 +1,12 @@
-import { CircuitBreakerStatus } from '../ICircuitBreakerState';
+import { CircuitBreakerStatus, CircuitBreakerState } from './CircuitBreakerState';
 
-class InMemoryCircuitBreakerState {
+class LocalCircuitBreakerState implements CircuitBreakerState {
     private status: CircuitBreakerStatus;
     private recoveryTimeout: number;
     private failureThreshold: number;
     private consecutiveFailures: number;
     private lastDetectedFailure?: Date;
-    private observers: ((previousStatus: CircuitBreakerStatus, currentStatus: CircuitBreakerStatus) => void)[];
+    private observers: ((previousState: CircuitBreakerStatus, currentState: CircuitBreakerStatus) => void)[];
 
     public constructor(recoveryTimeout: number, failureThreshold: number) {
         this.status = CircuitBreakerStatus.CLOSED;
@@ -14,6 +14,30 @@ class InMemoryCircuitBreakerState {
         this.recoveryTimeout = recoveryTimeout;
         this.consecutiveFailures = 0;
         this.observers = [];
+    }
+
+    public isClosed(): boolean {
+        return this.getStatus() === CircuitBreakerStatus.CLOSED;
+    }
+
+    public isOpen(): boolean {
+        return this.getStatus() === CircuitBreakerStatus.OPEN;
+    }
+
+    public isHalfOpen(): boolean {
+        return this.getStatus() === CircuitBreakerStatus.HALF_OPEN;
+    }
+
+    public addObserver(
+        observer: (previousState: CircuitBreakerStatus, currentState: CircuitBreakerStatus) => void,
+    ): void {
+        this.observers.push(observer);
+    }
+
+    private notify(previousStatus: CircuitBreakerStatus, currentStatus: CircuitBreakerStatus) {
+        for (const observer of this.observers) {
+            observer(previousStatus, currentStatus);
+        }
     }
 
     public getStatus(): CircuitBreakerStatus {
@@ -29,41 +53,27 @@ class InMemoryCircuitBreakerState {
         return this.status;
     }
 
-    public isClosed() {
-        return this.getStatus() === CircuitBreakerStatus.CLOSED;
-    }
-
-    public isOpen() {
-        return this.getStatus() === CircuitBreakerStatus.OPEN;
-    }
-
-    public isHalfOpen() {
-        return this.getStatus() === CircuitBreakerStatus.HALF_OPEN;
-    }
-
-    private updateStatus(status: CircuitBreakerStatus) {
+    private setStatus(status: CircuitBreakerStatus) {
         const previousStatus = this.status;
         this.status = status;
-        for (const observer of this.observers) {
-            observer(previousStatus, status);
-        }
+        this.notify(previousStatus, status);
     }
 
     private close() {
-        this.updateStatus(CircuitBreakerStatus.CLOSED);
+        this.setStatus(CircuitBreakerStatus.CLOSED);
     }
 
     private open() {
-        this.updateStatus(CircuitBreakerStatus.OPEN);
+        this.setStatus(CircuitBreakerStatus.OPEN);
         this.lastDetectedFailure = new Date();
     }
 
     private halfOpen() {
-        this.updateStatus(CircuitBreakerStatus.HALF_OPEN);
+        this.setStatus(CircuitBreakerStatus.HALF_OPEN);
         this.consecutiveFailures = 0;
     }
 
-    public fail() {
+    public onFailure() {
         this.consecutiveFailures++;
         if (this.consecutiveFailures > this.failureThreshold) {
             this.open();
@@ -73,16 +83,12 @@ class InMemoryCircuitBreakerState {
         }
     }
 
-    public succeed() {
+    public onSuccess() {
         this.consecutiveFailures = 0;
         if (this.isHalfOpen()) {
             this.close();
         }
     }
-
-    public addObserver(observer: (previousState: CircuitBreakerStatus, currentState: CircuitBreakerStatus) => void) {
-        this.observers.push(observer);
-    }
 }
 
-export { InMemoryCircuitBreakerState, CircuitBreakerStatus };
+export { LocalCircuitBreakerState };

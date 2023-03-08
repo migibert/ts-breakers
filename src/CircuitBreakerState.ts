@@ -4,7 +4,7 @@ enum CircuitBreakerStatus {
     CLOSED = 'CLOSED',
 }
 
-interface ICircuitBreakerState {
+interface CircuitBreakerState {
     getStatus(): CircuitBreakerStatus;
 
     isClosed(): boolean;
@@ -13,11 +13,11 @@ interface ICircuitBreakerState {
 
     isHalfOpen(): boolean;
 
-    fail(): void;
+    onFailure(): void;
 
-    succeed(): void;
+    onSuccess(): void;
 
     addObserver(observer: (previousState: CircuitBreakerStatus, currentState: CircuitBreakerStatus) => void): void;
 }
 
-export { ICircuitBreakerState, CircuitBreakerStatus };
+export { CircuitBreakerState, CircuitBreakerStatus };

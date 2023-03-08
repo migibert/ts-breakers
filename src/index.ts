@@ -1,3 +1,3 @@
 export { CircuitBreaker } from './CircuitBreaker';
-export { CircuitBreakerState } from './providers/InMemoryCircuitBreakerState';
+export { CircuitBreakerStatus, CircuitBreakerState } from './CircuitBreakerState';
 export { CircuitBreakerError } from './CircuitBreakerError';

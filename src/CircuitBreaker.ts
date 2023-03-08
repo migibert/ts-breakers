@@ -1,21 +1,21 @@
 import { CircuitBreakerError } from './CircuitBreakerError';
-import { CircuitBreakerStatus, InMemoryCircuitBreakerState } from './providers/InMemoryCircuitBreakerState';
-import { ICircuitBreakerState } from './ICircuitBreakerState';
+import { LocalCircuitBreakerState } from './LocalCircuitBreakerState';
+import { CircuitBreakerStatus, CircuitBreakerState } from './CircuitBreakerState';
 
 class CircuitBreaker {
     public readonly id: string;
-    private state: ICircuitBreakerState;
+    private state: CircuitBreakerState;
 
-    constructor(id: string, failureThreshold: number, recoveryTimeout: number) {
+    constructor(id: string, failureThreshold: number, recoveryTimeout: number, state?: CircuitBreakerState) {
         this.id = id;
-        this.state = new InMemoryCircuitBreakerState(recoveryTimeout, failureThreshold);
+        this.state = state || new LocalCircuitBreakerState(recoveryTimeout, failureThreshold);
     }
 
     public getStatus(): CircuitBreakerStatus {
         return this.state.getStatus();
     }
 
-    public addObserver(observer: (previousState: CircuitBreakerStatus, currentState: CircuitBreakerStatus) => void) {
+    public addObserver(observer: (previousStatus: CircuitBreakerStatus, currentStatus: CircuitBreakerStatus) => void) {
         this.state.addObserver(observer);
     }
 
@@ -28,10 +28,10 @@ class CircuitBreaker {
                     throw new CircuitBreakerError(`${this.id} is OPEN`);
                 }
                 const result = targetFunction(...parameters);
-                this.state.succeed();
+                this.state.onSuccess();
                 return result;
             } catch (e: any) {
-                this.state.fail();
+                this.state.onFailure();
                 throw e;
             }
         };
@@ -47,11 +47,11 @@ class CircuitBreaker {
             const promise = targetFunction(...parameters);
             return promise.then(
                 (value: TReturn) => {
-                    this.state.succeed();
+                    this.state.onSuccess();
                     return value;
                 },
                 (error: any) => {
-                    this.state.fail();
+                    this.state.onFailure();
                     throw error;
                 },
             );
