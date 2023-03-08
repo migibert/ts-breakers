@@ -20,14 +20,11 @@ type CircuitBreakerConfiguration = {
  *  class MyClass {...}
  *
  */
-export function CircuitBreakerDecorator(config: CircuitBreakerConfiguration): ClassDecorator {
-    const { failureThreshold, recoveryTimeout } = config;
+export function CircuitBreakerDecorator({ failureThreshold, recoveryTimeout, observers = [] }: CircuitBreakerConfiguration): ClassDecorator {
     return (target: Function) => {
         const circuitBreaker = new CircuitBreaker(target.name, failureThreshold, recoveryTimeout);
-        if (config.observers) {
-            for (const observer of config.observers) {
-                circuitBreaker.addObserver(observer);
-            }
+        for (const observer of observers) {
+            circuitBreaker.addObserver(observer);
         }
         for (const key of Object.getOwnPropertyNames(target.prototype)) {
             const value = target.prototype[key];
