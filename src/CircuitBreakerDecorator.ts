@@ -1,5 +1,5 @@
-import { CircuitBreaker } from '../CircuitBreaker';
-import { CircuitBreakerState } from '../CircuitBreakerState';
+import { CircuitBreaker } from './CircuitBreaker';
+import { CircuitBreakerState } from './CircuitBreakerState';
 
 type CircuitBreakerConfiguration = {
     failureThreshold: number;

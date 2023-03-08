@@ -1,4 +1,4 @@
-import { CircuitBreakerError } from '../CircuitBreakerError';
+import { CircuitBreakerError } from './CircuitBreakerError';
 import { CircuitBreakerDecorator } from './CircuitBreakerDecorator';
 
 describe('CircuitBreakerDecorator test Suite', () => {
