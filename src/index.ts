@@ -1,3 +1,8 @@
-export { CircuitBreaker } from './CircuitBreaker';
-export { CircuitBreakerStatus, CircuitBreakerState } from './CircuitBreakerState';
+export {
+    CircuitBreaker,
+    CircuitBreakerState,
+    CircuitBreakerConfiguration,
+    CircuitBreakerStatus,
+    CircuitBreakerStorageStrategy,
+} from './CircuitBreaker';
 export { CircuitBreakerError } from './CircuitBreakerError';
