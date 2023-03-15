@@ -21,7 +21,7 @@ type CircuitBreakerConfiguration = {
 class CircuitBreaker {
     private id: string;
     private storageStrategy: CircuitBreakerStorageStrategy;
-    private observers: Array<(previous: CircuitBreakerStatus, next: CircuitBreakerStatus) => void>;
+    private observers: ((previous: CircuitBreakerStatus, next: CircuitBreakerStatus) => void)[];
 
     constructor(id: string, storageStrategy: CircuitBreakerStorageStrategy) {
         this.id = id;
@@ -97,7 +97,7 @@ class CircuitBreaker {
 
         this.updateState({
             status: targetStatus,
-            consecutiveFailures: consecutiveFailures,
+            consecutiveFailures,
             lastDetectedFailure: new Date(),
         });
     }
