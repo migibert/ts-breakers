@@ -14,29 +14,19 @@ type CircuitBreakerState = {
 };
 
 type CircuitBreakerConfiguration = {
-    id: string;
     failureThreshold: number;
     recoveryTimeout: number;
 };
 
 class CircuitBreaker {
-    private configuration: CircuitBreakerConfiguration;
-    private state: CircuitBreakerState;
+    private id: string;
     private storageStrategy: CircuitBreakerStorageStrategy;
     private observers: Array<(previous: CircuitBreakerStatus, next: CircuitBreakerStatus) => void>;
 
-    constructor(
-        defaultConfiguration: CircuitBreakerConfiguration,
-        initialState: CircuitBreakerState,
-        storageStrategy: CircuitBreakerStorageStrategy,
-    ) {
-        this.configuration = defaultConfiguration;
-        this.state = initialState;
+    constructor(id: string, storageStrategy: CircuitBreakerStorageStrategy) {
+        this.id = id;
         this.storageStrategy = storageStrategy;
         this.observers = [];
-
-        this.state = this.storageStrategy.loadState();
-        this.configuration = this.storageStrategy.loadConfiguration();
     }
 
     public addObserver(observer: (previous: CircuitBreakerStatus, next: CircuitBreakerStatus) => void): void {
@@ -44,35 +34,38 @@ class CircuitBreaker {
     }
 
     private updateState(state: CircuitBreakerState): void {
-        const previousState = this.storageStrategy.loadState();
-        if (previousState === state) {
+        const loadedState = this.storageStrategy.loadState();
+        if (loadedState === state) {
             return;
         }
-        this.state = state;
         this.storageStrategy.saveState(state);
         for (const observer of this.observers) {
-            if (state.status !== previousState.status) {
-                observer(previousState.status, state.status);
+            if (state.status !== loadedState.status) {
+                observer(loadedState.status, state.status);
             }
         }
     }
 
     public getStatus(): CircuitBreakerStatus {
-        if (this.state.status === CircuitBreakerStatus.OPEN) {
-            if (!this.state.lastDetectedFailure) {
-                throw new Error('Inconsistent state: an OPEN circuit must have a last detected failure date');
+        const configuration = this.storageStrategy.loadConfiguration();
+        const state = this.storageStrategy.loadState();
+        if (state.status === CircuitBreakerStatus.OPEN) {
+            if (!state.lastDetectedFailure) {
+                throw new Error(
+                    '${this.id} circuit breaker is in an inconsistent state: an OPEN circuit must have a last detected failure date',
+                );
             }
-            const elapsed = new Date().getTime() - this.state.lastDetectedFailure.getTime();
-            if (elapsed > this.configuration.recoveryTimeout) {
+            const elapsed = new Date().getTime() - state.lastDetectedFailure.getTime();
+            if (elapsed > configuration.recoveryTimeout) {
                 this.updateState({
                     status: CircuitBreakerStatus.HALF_OPEN,
-                    consecutiveFailures: this.state.consecutiveFailures,
-                    lastDetectedFailure: this.state.lastDetectedFailure,
+                    consecutiveFailures: state.consecutiveFailures,
+                    lastDetectedFailure: state.lastDetectedFailure,
                 });
                 return CircuitBreakerStatus.HALF_OPEN;
             }
         }
-        return this.state.status;
+        return state.status;
     }
 
     public isClosed(): boolean {
@@ -88,10 +81,13 @@ class CircuitBreaker {
     }
 
     public collectFailure() {
-        const consecutiveFailures = this.state.consecutiveFailures + 1;
-        let targetStatus = this.state.status;
+        const configuration = this.storageStrategy.loadConfiguration();
+        const state = this.storageStrategy.loadState();
 
-        if (consecutiveFailures > this.configuration.failureThreshold) {
+        const consecutiveFailures = state.consecutiveFailures + 1;
+        let targetStatus = state.status;
+
+        if (consecutiveFailures > configuration.failureThreshold) {
             targetStatus = CircuitBreakerStatus.OPEN;
         }
 
@@ -107,8 +103,9 @@ class CircuitBreaker {
     }
 
     public collectSuccess() {
-        let targetStatus = this.state.status;
+        const state = this.storageStrategy.loadState();
 
+        let targetStatus = state.status;
         if (this.isHalfOpen()) {
             targetStatus = CircuitBreakerStatus.CLOSED;
         }
@@ -125,7 +122,7 @@ class CircuitBreaker {
         return (...parameters: TArgs) => {
             try {
                 if (this.isOpen()) {
-                    throw new CircuitBreakerError(`${this.configuration.id} is OPEN`);
+                    throw new CircuitBreakerError(`${this.id} is OPEN`);
                 }
                 const result = targetFunction(...parameters);
                 this.collectSuccess();
@@ -142,7 +139,7 @@ class CircuitBreaker {
     ): (...parameters: TArgs) => Promise<TReturn> {
         return (...parameters: TArgs): Promise<TReturn> => {
             if (this.isOpen()) {
-                return Promise.reject(new CircuitBreakerError(`Circuit ${this.configuration.id} is OPEN`));
+                return Promise.reject(new CircuitBreakerError(`Circuit ${this.id} is OPEN`));
             }
             const promise = targetFunction(...parameters);
             return promise.then(

@@ -2,29 +2,29 @@ import { CircuitBreakerConfiguration, CircuitBreakerState } from './CircuitBreak
 import { CircuitBreakerStorageStrategy } from './CircuitBreakerStorageStrategy';
 
 class InMemoryCircuitBreakerStorageStrategy implements CircuitBreakerStorageStrategy {
-    private state: CircuitBreakerState;
     private configuration: CircuitBreakerConfiguration;
+    private state: CircuitBreakerState;
 
-    public constructor(state: CircuitBreakerState, configuration: CircuitBreakerConfiguration) {
-        this.state = state;
+    public constructor(configuration: CircuitBreakerConfiguration, state: CircuitBreakerState) {
         this.configuration = configuration;
-    }
-
-    saveState(state: CircuitBreakerState): void {
         this.state = state;
     }
 
-    loadState(): CircuitBreakerState {
+    public saveState(state: CircuitBreakerState): void {
+        this.state = state;
+    }
+
+    public loadState(): CircuitBreakerState {
         return this.state;
     }
 
-    saveConfiguration(configuration: CircuitBreakerConfiguration): void {
+    public saveConfiguration(configuration: CircuitBreakerConfiguration): void {
         this.configuration = configuration;
     }
 
-    loadConfiguration(): CircuitBreakerConfiguration {
+    public loadConfiguration(): CircuitBreakerConfiguration {
         return this.configuration;
     }
 }
 
-export { InMemoryCircuitBreakerStorageStrategy as InMemoryStorageStrategy };
+export { InMemoryCircuitBreakerStorageStrategy };

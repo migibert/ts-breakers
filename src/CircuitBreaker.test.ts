@@ -6,7 +6,7 @@ import {
     CircuitBreakerStorageStrategy,
 } from './CircuitBreaker';
 import { CircuitBreakerError } from './CircuitBreakerError';
-import { InMemoryStorageStrategy } from './InMemoryStorageStrategy';
+import { InMemoryCircuitBreakerStorageStrategy } from './InMemoryCircuitBreakerStorageStrategy';
 
 class MyError extends Error {
     constructor(msg: string) {
@@ -172,8 +172,8 @@ describe('State Machine Test Suite', () => {
 
                     const configuration = { id: 'test', failureThreshold, recoveryTimeout };
                     const state = { status: CircuitBreakerStatus.CLOSED, consecutiveFailures: 0 };
-                    const strategy = new InMemoryStorageStrategy(state, configuration);
-                    const cb = new CircuitBreaker(configuration, state, strategy);
+                    const strategy = new InMemoryCircuitBreakerStorageStrategy(configuration, state);
+                    const cb = new CircuitBreaker('test', strategy);
                     cb.addObserver(observer);
 
                     if (synchronous === true) {
@@ -203,10 +203,10 @@ describe('Wrapper Interface Test Suite', () => {
     let cb: CircuitBreaker;
 
     beforeEach(() => {
-        configuration = { id: 'test', failureThreshold: 5, recoveryTimeout: 2000 };
+        configuration = { failureThreshold: 5, recoveryTimeout: 2000 };
         state = { status: CircuitBreakerStatus.CLOSED, consecutiveFailures: 0 };
-        strategy = new InMemoryStorageStrategy(state, configuration);
-        cb = new CircuitBreaker(configuration, state, strategy);
+        strategy = new InMemoryCircuitBreakerStorageStrategy(configuration, state);
+        cb = new CircuitBreaker('test', strategy);
     });
 
     describe('synchronous', () => {
@@ -235,10 +235,6 @@ describe('Wrapper Interface Test Suite', () => {
     describe('asynchronous', () => {
         test('When function is wrapped, then its parameter and typing are preserved', async () => {
             const sum = (a: number, b: number): Promise<number> => Promise.resolve(a + b);
-            const configuration = { id: 'test', failureThreshold: 5, recoveryTimeout: 2000 };
-            const state = { status: CircuitBreakerStatus.CLOSED, consecutiveFailures: 0 };
-            const strategy = new InMemoryStorageStrategy(state, configuration);
-            const cb = new CircuitBreaker(configuration, state, strategy);
             const wrapped = cb.wrapAsyncFunction(sum);
 
             const result = wrapped(2, 3);
@@ -247,20 +243,12 @@ describe('Wrapper Interface Test Suite', () => {
         });
 
         test('When function is wrapped, then its exceptions are bubbled up', async () => {
-            const configuration = { id: 'test', failureThreshold: 5, recoveryTimeout: 2000 };
-            const state = { status: CircuitBreakerStatus.CLOSED, consecutiveFailures: 0 };
-            const strategy = new InMemoryStorageStrategy(state, configuration);
-            const cb = new CircuitBreaker(configuration, state, strategy);
             const wrapped = cb.wrapAsyncFunction(unstableAsyncFn);
 
             await expect(wrapped(true)).rejects.toThrow(MyError);
         });
 
         test('When function is wrapped and circuit is open, then thrown exception is CircuitBreakerError', async () => {
-            const configuration = { id: 'test', failureThreshold: 5, recoveryTimeout: 2000 };
-            const state = { status: CircuitBreakerStatus.CLOSED, consecutiveFailures: 0 };
-            const strategy = new InMemoryStorageStrategy(state, configuration);
-            const cb = new CircuitBreaker(configuration, state, strategy);
             const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, configuration.failureThreshold + 1);
 
             await expect(wrapped(true)).rejects.toThrow(CircuitBreakerError);
