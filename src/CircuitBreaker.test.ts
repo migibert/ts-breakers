@@ -1,6 +1,12 @@
-import { CircuitBreakerState } from './CircuitBreakerState';
-import { CircuitBreaker } from './CircuitBreaker';
+import {
+    CircuitBreaker,
+    CircuitBreakerConfiguration,
+    CircuitBreakerState,
+    CircuitBreakerStatus,
+    CircuitBreakerStorageStrategy,
+} from './CircuitBreaker';
 import { CircuitBreakerError } from './CircuitBreakerError';
+import { InMemoryCircuitBreakerStorageStrategy } from './InMemoryCircuitBreakerStorageStrategy';
 
 class MyError extends Error {
     constructor(msg: string) {
@@ -107,63 +113,67 @@ describe('State Machine Test Suite', () => {
                 {
                     consecutiveFailures: 0,
                     delay: 0,
-                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedStatus: CircuitBreakerStatus.CLOSED,
                     expectedNotifications: [],
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: 0,
-                    expectedState: CircuitBreakerState.OPEN,
-                    expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
+                    expectedStatus: CircuitBreakerStatus.OPEN,
+                    expectedNotifications: [[CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN]],
                 },
                 {
                     consecutiveFailures: failureThreshold,
                     delay: 0,
-                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedStatus: CircuitBreakerStatus.CLOSED,
                     expectedNotifications: [],
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: recoveryTimeout + 20,
-                    expectedState: CircuitBreakerState.HALF_OPEN,
+                    expectedStatus: CircuitBreakerStatus.HALF_OPEN,
                     expectedNotifications: [
-                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
+                        [CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN],
+                        [CircuitBreakerStatus.OPEN, CircuitBreakerStatus.HALF_OPEN],
                     ],
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: recoveryTimeout - 20,
-                    expectedState: CircuitBreakerState.OPEN,
-                    expectedNotifications: [[CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN]],
+                    expectedStatus: CircuitBreakerStatus.OPEN,
+                    expectedNotifications: [[CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN]],
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: recoveryTimeout + 20,
-                    expectedState: CircuitBreakerState.OPEN,
+                    expectedStatus: CircuitBreakerStatus.OPEN,
                     expectedNotifications: [
-                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                        [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.OPEN],
+                        [CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN],
+                        [CircuitBreakerStatus.OPEN, CircuitBreakerStatus.HALF_OPEN],
+                        [CircuitBreakerStatus.HALF_OPEN, CircuitBreakerStatus.OPEN],
                     ],
                     failAfterDelay: true,
                 },
                 {
                     consecutiveFailures: failureThreshold + 1,
                     delay: recoveryTimeout + 20,
-                    expectedState: CircuitBreakerState.CLOSED,
+                    expectedStatus: CircuitBreakerStatus.CLOSED,
                     expectedNotifications: [
-                        [CircuitBreakerState.CLOSED, CircuitBreakerState.OPEN],
-                        [CircuitBreakerState.OPEN, CircuitBreakerState.HALF_OPEN],
-                        [CircuitBreakerState.HALF_OPEN, CircuitBreakerState.CLOSED],
+                        [CircuitBreakerStatus.CLOSED, CircuitBreakerStatus.OPEN],
+                        [CircuitBreakerStatus.OPEN, CircuitBreakerStatus.HALF_OPEN],
+                        [CircuitBreakerStatus.HALF_OPEN, CircuitBreakerStatus.CLOSED],
                     ],
                     failAfterDelay: false,
                 },
             ])(
-                'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen, $delay ms elapsed, then the circuit is $expectedState',
-                async ({ consecutiveFailures, delay, expectedState, expectedNotifications, failAfterDelay }) => {
+                'Given a failure treshold set to 3 and a recovery timeout set to 100, When $consecutiveFailures consecutive failures happen, $delay ms elapsed, then the circuit is $expectedStatus',
+                async ({ consecutiveFailures, delay, expectedStatus, expectedNotifications, failAfterDelay }) => {
                     const observer = jest.fn();
-                    const cb = new CircuitBreaker('test', failureThreshold, recoveryTimeout);
+
+                    const configuration = { id: 'test', failureThreshold, recoveryTimeout };
+                    const state = { status: CircuitBreakerStatus.CLOSED, consecutiveFailures: 0 };
+                    const strategy = new InMemoryCircuitBreakerStorageStrategy(configuration, state);
+                    const cb = new CircuitBreaker('test', strategy);
                     cb.addObserver(observer);
 
                     if (synchronous === true) {
@@ -175,7 +185,7 @@ describe('State Machine Test Suite', () => {
                         jest.advanceTimersByTime(delay);
                         await testAsynchronousExtraFailure(wrapped, failAfterDelay);
                     }
-                    expect(cb.state).toBe(expectedState);
+                    expect(cb.getStatus()).toBe(expectedStatus);
                     expect(observer).toBeCalledTimes(expectedNotifications.length);
                     for (let i = 0; i < expectedNotifications.length; i++) {
                         expect(observer.mock.calls[i]).toEqual(expectedNotifications[i]);
@@ -187,10 +197,21 @@ describe('State Machine Test Suite', () => {
 });
 
 describe('Wrapper Interface Test Suite', () => {
+    let configuration: CircuitBreakerConfiguration;
+    let state: CircuitBreakerState;
+    let strategy: CircuitBreakerStorageStrategy;
+    let cb: CircuitBreaker;
+
+    beforeEach(() => {
+        configuration = { failureThreshold: 5, recoveryTimeout: 2000 };
+        state = { status: CircuitBreakerStatus.CLOSED, consecutiveFailures: 0 };
+        strategy = new InMemoryCircuitBreakerStorageStrategy(configuration, state);
+        cb = new CircuitBreaker('test', strategy);
+    });
+
     describe('synchronous', () => {
         test('When function is wrapped, then its parameter and typing are preserved', () => {
             const sum = (a: number, b: number): number => a + b;
-            const cb = new CircuitBreaker('test', 5, 2000);
             const wrapped = cb.wrapFunction(sum);
 
             const result = wrapped(2, 3);
@@ -199,16 +220,13 @@ describe('Wrapper Interface Test Suite', () => {
         });
 
         test('When function is wrapped, then its exceptions are bubbled up', () => {
-            const cb = new CircuitBreaker('test', 5, 2000);
             const wrapped = cb.wrapFunction(unstableFn);
 
             expect(() => wrapped(true)).toThrow(MyError);
         });
 
         test('When function is wrapped and circuit is open, then thrown exception is CircuitBreakerError', () => {
-            const failureThreshold = 3;
-            const cb = new CircuitBreaker('test', failureThreshold, 2000);
-            const wrapped = failConsecutively(cb, unstableFn, failureThreshold + 1);
+            const wrapped = failConsecutively(cb, unstableFn, configuration.failureThreshold + 1);
 
             expect(() => wrapped(true)).toThrow(CircuitBreakerError);
         });
@@ -217,7 +235,6 @@ describe('Wrapper Interface Test Suite', () => {
     describe('asynchronous', () => {
         test('When function is wrapped, then its parameter and typing are preserved', async () => {
             const sum = (a: number, b: number): Promise<number> => Promise.resolve(a + b);
-            const cb = new CircuitBreaker('test', 5, 2000);
             const wrapped = cb.wrapAsyncFunction(sum);
 
             const result = wrapped(2, 3);
@@ -226,16 +243,13 @@ describe('Wrapper Interface Test Suite', () => {
         });
 
         test('When function is wrapped, then its exceptions are bubbled up', async () => {
-            const cb = new CircuitBreaker('test', 5, 2000);
             const wrapped = cb.wrapAsyncFunction(unstableAsyncFn);
 
             await expect(wrapped(true)).rejects.toThrow(MyError);
         });
 
         test('When function is wrapped and circuit is open, then thrown exception is CircuitBreakerError', async () => {
-            const failureThreshold = 3;
-            const cb = new CircuitBreaker('test', failureThreshold, 2000);
-            const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, failureThreshold + 1);
+            const wrapped = await failConsecutivelyAsync(cb, unstableAsyncFn, configuration.failureThreshold + 1);
 
             await expect(wrapped(true)).rejects.toThrow(CircuitBreakerError);
         });
